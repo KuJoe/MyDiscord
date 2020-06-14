@@ -24,7 +24,7 @@ function MyDiscord_info() {
 		"website"		=> "https://kujoe.net",
 		"author"		=> "KuJoe",
 		"authorsite"	=> "https://kujoe.net",
-		"version"		=> "1.2",
+		"version"		=> "2.0",
 		'compatibility'	=> '18*',
 		'codename'		=> 'mydiscord'
 	);
@@ -64,9 +64,31 @@ function mydiscord_install() {
 		'disporder'   	=> 2,
 		'gid'			=> intval($gid)
 	);
+	
+	$mydiscord_setting_3 = array(
+		'name'			=> 'mydiscord_invite',
+		'title'			=> 'Discord Invite Code',
+		'description'  	=> 'Enter the 6 character Discord Invite Code you would like to display',
+		'optionscode'  	=> 'text',
+		'value'      	=> '0',
+		'disporder'   	=> 3,
+		'gid'			=> intval($gid)
+	);
+	
+	$mydiscord_setting_4 = array(
+		'name'			=> 'mydiscord_token',
+		'title'			=> 'Discord Bot Token',
+		'description'  	=> 'Enter your Discord Bot Token (https://discordapp.com/developers)',
+		'optionscode'  	=> 'text',
+		'value'      	=> '0',
+		'disporder'   	=> 4,
+		'gid'			=> intval($gid)
+	);
 
 	$db->insert_query('settings', $mydiscord_setting_1);
 	$db->insert_query('settings', $mydiscord_setting_2);
+	$db->insert_query('settings', $mydiscord_setting_3);
+	$db->insert_query('settings', $mydiscord_setting_4);
 	rebuild_settings();
 }
 
@@ -88,6 +110,8 @@ function mydiscord_uninstall() {
 	$db->delete_query('settinggroups', "name='MyDiscord'");
 	$db->delete_query('settings', "name='mydiscord_onoff'");
 	$db->delete_query('settings', "name='mydiscord_id'");
+	$db->delete_query('settings', "name='mydiscord_invite'");
+	$db->delete_query('settings', "name='mydiscord_token'");
 	$db->query("DROP TABLE ". $db->table_prefix ."mydiscord");
 	rebuild_settings();
 }
@@ -116,7 +140,7 @@ function mydiscord_activate() {
 	}
 
 	$title = "mydiscordnotification";
-	$template = '<div class="mydiscordnotification">{$discordicon}<strong>{$discordname}{$discordonline}{$discordtotal}{$discordinvite}</strong></div>';
+	$template = '<div class="mydiscordnotification">{$discordicon} <strong>{$discordname}{$discordonline}{$discordtotal}{$discordinvite}</strong></div>';
 	$notification = array(
 		"title" => $db->escape_string($title),
 		"template" => $db->escape_string($template),
@@ -130,8 +154,9 @@ function mydiscord_activate() {
 	$db->query("CREATE TABLE IF NOT EXISTS ". $db->table_prefix ."mydiscord (
 		`discordid` BIGINT DEFAULT NULL ,
 		`discordname` TEXT DEFAULT NULL ,
-		`discordinvite` TEXT DEFAULT NULL ,
-		`online` TEXT DEFAULT NULL ,
+		`discordicon` TEXT DEFAULT NULL ,
+		`members_total` TEXT DEFAULT NULL ,
+		`members_online` TEXT DEFAULT NULL ,
 		`lastchkd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP ,
 		UNIQUE KEY (`discordid`)
 		) ENGINE=MyISAM{$collation};"
@@ -159,10 +184,13 @@ function mydiscord_deactivate() {
 	update_theme_stylesheet_list("1");
 }
 
-function getDiscord($url) {
+function getDiscord($url,$token) {
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+		'Authorization: Bot '.$token.''
+	));
 	$data = curl_exec($ch);
 	curl_close($ch);
 	return $data;
@@ -172,33 +200,42 @@ function MyDiscordNotification() {
 	global $db, $mybb, $templates, $mydiscordnotification;
 	if($mybb->settings['mydiscord_onoff'] == 1) {
 		$guildid = intval($mybb->settings['mydiscord_id']);
+		$token = $mybb->settings['mydiscord_token'];
 		$query = $db->simple_select("mydiscord", "*", "discordid='$guildid'");
 		$count = $db->num_rows($query);
 		if($count == 0) {
+			$settime = date('Y-m-d H:i:s', strtotime("-6 minutes"));
 			$create = array(
 				"discordid" => $db->escape_string($guildid),
+				"lastchkd" => $db->escape_string($settime),
 			);
 			$db->insert_query("mydiscord", $create);
 		}
 		$get = $db->fetch_array($db->simple_select("mydiscord", "*", "discordid='$guildid'"));
 		if(strtotime($get['lastchkd']) < strtotime("-5 minutes")) {
-			$widget_decode = json_decode(getDiscord('https://discordapp.com/api/guilds/'.$guildid.'/widget.json'), true);
-			if(!$widget_decode['id']) {
-				$discordname = "Did you enter the correct Server ID? If so, check to make sure you enabled the widget in your Server Settings.";
-				$discordonline = ' ('.$widget_decode['code'].')';
-				$discordinvite = '';
+			$guild_decode = json_decode(getDiscord('https://discordapp.com/api/guilds/'.$guildid.'?with_counts=true',$token), true);
+			if($guild_decode['id']) {
+				$discordicon = '<img src="https://cdn.discordapp.com/icons/'.$guildid.'/'.$guild_decode['icon'].'.png?size=32" />';
+				$discordname = $guild_decode['name'];
+				$members_online = $guild_decode['approximate_presence_count'];
+				$members_total = $guild_decode['approximate_member_count'];
+				$discordtotal = ' | Total Users: '.$members_total;
+				$discordonline = ' | Currently Online: '.$members_online;
+				$discordinvite = ' | <a href="https://discord.gg/'.$mybb->settings['mydiscord_invite'].'" target="_blank" />JOIN OUR DISCORD!</a>';
+				$db->query("UPDATE `" . $db->table_prefix . "mydiscord` SET `discordname` = '$discordname',`discordicon` = '$discordicon',`members_online` = '$members_online',`members_total` = '$members_total',`lastchkd` = NOW() WHERE discordid='$guildid'");
 			} else {
-				$discordname = $widget_decode['name'];
-				$online = count($widget_decode['members']);
-				$discordonline = ' | Currently Online: '.$online;
-				$invitelink = $widget_decode['instant_invite'];
-				$discordinvite = ' | <a href="'.$invitelink.'" target="_blank" />JOIN OUR DISCORD!</a>';
-				$db->query("UPDATE `" . $db->table_prefix . "mydiscord` SET `discordname` = '$discordname',`online` = '$online',`discordinvite` = '$invitelink',`lastchkd` = NOW() WHERE discordid='$guildid'");
+				$discordicon = '<img src="https://discordapp.com/assets/28174a34e77bb5e5310ced9f95cb480b.png" alt="Discord" />';
+				$discordname = "Did you enter the correct ID and Token?";
+				$discordtotal = '';
+				$discordonline = '';
+				$discordinvite = ' | <a href="https://discord.gg/'.$mybb->settings['mydiscord_invite'].'" target="_blank" />JOIN OUR DISCORD!</a>';
 			}
 		} else {
-			$discordname = $get['name'];
-			$discordonline = ' | Currently Online: '.$get['online'];
-			$discordinvite = ' | <a href="'.$get['invitelink'].'" target="_blank" />JOIN OUR DISCORD!</a>';
+			$discordicon = $get['discordicon'];
+			$discordname = $get['discordname'];
+			$discordtotal = ' | Total Users: '.$get['members_total'];
+			$discordonline = ' | Currently Online: '.$get['members_online'];
+			$discordinvite = ' | <a href="https://discord.gg/'.$mybb->settings['mydiscord_invite'].'" target="_blank" />JOIN OUR DISCORD!</a>';
 		}
 		eval("\$mydiscordnotification = \"".$templates->get('mydiscordnotification')."\";");
 	}

@@ -1,7 +1,7 @@
 # MyDiscord
 MyBB Plugin by KuJoe <KuJoe.net>
 
-Adds a Discord invite link and server stats to the MyBB forum header using the Widget functionality in Server Settings.
+Adds a Discord invite link, server stats, and more functionality to the MyBB forum using a bot.
 
 # How to install:
 1. Upload the included \inc\ folder into your forums root directory (this will result in 1 mydiscord.php file in your \plugins\ directory and 1 mydiscord.css file in your \plugins\mydiscord\ directory).
@@ -9,6 +9,8 @@ Adds a Discord invite link and server stats to the MyBB forum header using the W
 3. Enable and add Discord ID in Settings.
 
 # How to update:
+NOTE: Upgrading to 2.0 from 1.x requires you to "Uninstall" then "Install & Activate".
+
 1. Deactivate (NO NEED TO UNINSTALL! If you uninstall you'll need to re-enter your Discord ID).
 2. Upload the included \inc\ folder into your forums root directory (this will result in 1 mydiscord.php file in your \plugins\ directory and 1 mydiscord.css file in your \plugins\mydiscord\ directory).
 3. Activate the plugin.
