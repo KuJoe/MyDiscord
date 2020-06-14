@@ -1,0 +1,22 @@
+.mydiscordnotification {
+	color: #23272A;
+	font-size:18px;
+	text-align: center;
+	border: 1px solid #2C2F33;
+	-moz-border-radius: 5px;
+	-webkit-border-radius: 5px;
+	border-radius: 5px;
+	padding: 10px 12px 5px 0;
+	margin: 5px 0;
+	background-color:#7289DA;
+}
+
+.mydiscordnotification img{
+	height:20px;
+	width:20px;
+	margin: -3px 0;
+}
+
+.mydiscordnotification a{
+	color: #0000ff;
+}
